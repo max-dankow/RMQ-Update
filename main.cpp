@@ -7,8 +7,11 @@
 #include <stdlib.h>
 #include "rmq.h"
 
-typedef int DataType;
+typedef long long DataType;
 static const size_t TEST_NUMBER = 100;
+static const DataType TEST_RANGE_MIN = -1000;
+static const DataType TEST_RANGE_MAX = 1000;
+static const int TEST_SIZE = 100;
 
 struct min_functor
 {
@@ -28,10 +31,9 @@ public:
 
     void update(size_t bound_left, size_t bound_right, DataType delta)
     {
-        size_t left = std::max(bound_left, (size_t) 0);
-        size_t right = std::min(data.size(), bound_right + 1);
+        assert(bound_right < data.size() && bound_left <= bound_right);
 
-        for (size_t i = left; i < right; ++i)
+        for (size_t i = bound_left; i <= bound_right; ++i)
         {
             data[i] += delta;
         }
@@ -39,11 +41,10 @@ public:
 
     DataType get_min(size_t bound_left, size_t bound_right)
     {
-        size_t left = std::max(bound_left, (size_t) 0);
-        size_t right = std::min(data.size(), bound_right + 1);
+        assert(bound_right < data.size() && bound_left <= bound_right);
         DataType range_min = std::numeric_limits<DataType>::max();
 
-        for (size_t i = left; i < right; ++i)
+        for (size_t i = bound_left; i <= bound_right; ++i)
         {
             range_min = std::min(data[i], range_min);
         }
@@ -121,16 +122,11 @@ void RMQ::update(int index, int seek_left, int seek_right,
     if (bound_left == seek_left && seek_right == bound_right)
     {
         delta[index] += add_delta;
-        /*if (bound_left == bound_right)
-        {
-            data[index] += delta[index];
-            delta[index] = 0;
-        }
-        */
     }
     else
     {
         int middle = (bound_left + bound_right) / 2;
+        push(index);
 
         update(get_son_left(index), seek_left, std::min(middle, seek_right),
                bound_left, middle, add_delta);
@@ -140,7 +136,6 @@ void RMQ::update(int index, int seek_left, int seek_right,
 
         data[index] = function(data[get_son_left(index)] + delta[get_son_left(index)],
                                data[get_son_right(index)] + delta[get_son_right(index)]);
-        push(index);
     }
 }
 
@@ -181,7 +176,7 @@ std::default_random_engine generator;
 std::vector<DataType> generate_vector(size_t size)
 {
     std::vector<DataType> random_data;
-    std::uniform_int_distribution<DataType> random_value(0, 10);
+    std::uniform_int_distribution<DataType> random_value(TEST_RANGE_MIN, TEST_RANGE_MAX);
 
     for (size_t i = 0; i < size; ++i)
         random_data.push_back(random_value(generator));
@@ -193,19 +188,20 @@ std::vector<DataType> generate_vector(size_t size)
 void test_solution()
 {
     std::uniform_int_distribution<int> random_operation(0, 5);
-    std::uniform_int_distribution<DataType> random_delta(0, 10);
+    std::uniform_int_distribution<DataType> random_delta(TEST_RANGE_MIN, TEST_RANGE_MAX);
 
-    std::vector<DataType> test_data = generate_vector(3);
+    std::vector<DataType> test_data = generate_vector(TEST_SIZE);
 
     Slow_RMQ slow(test_data);
     RMQ tree(test_data, min_functor(), std::numeric_limits<DataType>::max());
 
     for (size_t i = 0; i < TEST_NUMBER; ++i)
     {
-        std::uniform_int_distribution<size_t> random_left(0, test_data.size());
+        std::cout << i << '\n';
+        std::uniform_int_distribution<size_t> random_left(0, test_data.size() - 1);
         size_t left = random_left(generator);
 
-        std::uniform_int_distribution<size_t> random_right(left, test_data.size());
+        std::uniform_int_distribution<size_t> random_right(left, test_data.size() - 1);
         size_t right = random_right(generator);
 
         if (random_operation(generator) == 0)
